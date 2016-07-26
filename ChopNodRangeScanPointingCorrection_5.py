@@ -95,6 +95,7 @@ import os,sys
 #          True  - will trigger diagnostic output on the screen, plots, and displays
 verbose = True
 
+"""
 # ------------------------------------------------------------------------------
 # GET THE DATA
 # ------------------------------------------------------------------------------
@@ -113,7 +114,7 @@ if ((not locals().has_key('multiObs')) or (not multiObs)):
 # Next, get the data
 useHsa = 1
 obs = getObservation(obsid, verbose=True, useHsa=useHsa, poolLocation=None, poolName=None)
-"""
+
 if useHsa:
     saveObservation(obs, poolLocation='/home/sgongar/hcss/workspace/Point-offset-correction/pools', poolName='obs')
 """
@@ -185,7 +186,7 @@ except:
 # Example: outputDir = "/home/me/Herschel/PacsSpectro/pipelineOutput/"
 # When saveOutput is True, nameBasis will be used as basis for the filenames of all outputs
 saveOutput = True
-outputDir  = str(working_dir)+"/pacsSpecOutC5/"
+outputDir  = str(working_dir)+"pacsSpecOutC5/"
 if (not os.path.exists(outputDir)): os.mkdir(outputDir)
 if verbose and saveOutput: print "The products of this pipeline will be saved in ",outputDir
 

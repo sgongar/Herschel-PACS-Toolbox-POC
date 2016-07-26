@@ -31,20 +31,17 @@ obsids[1342244919] = "SEDC"
 obsids[1342188037] = "SEDD"
 obsids[1342188038] = "SEDE"
 
-observations_dict = {}
-
 for i in range(len(obsids.keys())):
-    observations_dict["obs_{0}".format(obsids.keys()[i])] = getObservation(obsids.keys()[i],
-                                                                           useHsa = 1)
+    obs = getObservation(obsids.keys()[i], useHsa = 1)
 
     execfile(str(working_dir) + 'ChopNodBackgroundNormalizationRange.py')
-    name = 'norm'
+    name = str(obsids.key()[i]) + 'norm'
     saveObservation(obs, poolLocation = pool_dir, poolName = name)
 
     execfile(str(working_dir) + 'ChopNodRangeScanPointingCorrection_5.py')
-    name = 'corr_5'
+    name = str(obsids.keys()[i]) + 'corr_5'
     saveObservation(obs, poolLocation = pool_dir, poolName = name)
 
     execfile(str(working_dir) + 'ChopNodRangeScanPointingCorrection_9.py')
-    name = 'corr_9'
+    name = str(obsids.keys()[i]) + 'corr_9'
     saveObservation(obs, poolLocation = pool_dir, poolName = name)
