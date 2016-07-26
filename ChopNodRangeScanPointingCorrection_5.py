@@ -1,6 +1,6 @@
 # 
 #  This file is part of Herschel Common Science System (HCSS).
-#  Copyright 2001-2011 Herschel Science Ground Segment Consortium
+#  Copyright 2001-2014 Herschel Science Ground Segment Consortium
 # 
 #  HCSS is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Lesser General Public License as
@@ -17,22 +17,31 @@
 #  If not, see <http://www.gnu.org/licenses/>.
 # 
 """    
-  $Id: ChopNodBackgroundNormalizationRange.py,v 1.40 2016/05/20 08:32:27 pierre Exp $      
-
+A CHANGE
+  $Id: ChopNodRangeScanPointingCorrection.py,v 1.15 2016/05/20 08:47:43 pierre Exp $      
 ----------------------------USER INSTRUCTIONS--------------------------------
 -----------------------PLEASE READ BEFORE YOU BEGIN--------------------------
 -----------------------!!!!!!!!!!!!!!!!!!!!!!!!!!!!--------------------------
 
 Available via:
- Pipeline -> PACS -> Spectrometer -> Chopped Large Range -> Background normalization
+ Pipelines -> PACS -> Spectrometer -> Chopped line scan -> Point Source Background Normalization
+ Also to be found in your HIPE installation directory in: scripts/pacs/scripts/ipipe/spec
 
 Purpose:
   PACS Spectrometer interactive pipeline processing from level 0 to level 2 for 
-  chopped Line or short range spectroscopy observations. Other scripts for 
+  chopped Line or short range Spectroscopy observations. Other scripts for 
   reducing PACS spectroscopy are available via the Pipeline menu in HIPE.
-  The differences between working with point and extended sources occur
-  after Level 2 (formal end of the pipeline), in the post-processing part.
+  This script is intended for point sources only, since it introduces a 
+  correction to the telescope pointing by comparing your data to the telescope 
+  beams. It uses the telescope background normalisation method for doing the 
+  flux calibration.
  
+  This script does work and has been tested on some targets, but it is still in 
+  the process of full performance and limit testing. It is therefore recommended 
+  that you check the effect of the pointing correction on your target, e.g. by comparing the 
+  results of this script with those of the background normalisation pipeline script for range scans.
+  Please also note that this pipeline is currently not completely documented in the PACS Data Reduction Guide.
+
 Note: 
   This file is the reference copy, taken from your current installation of HIPE.
   If you need to edit it, we recommend to copy it to a different location first.
@@ -176,11 +185,11 @@ except:
 # Example: outputDir = "/home/me/Herschel/PacsSpectro/pipelineOutput/"
 # When saveOutput is True, nameBasis will be used as basis for the filenames of all outputs
 saveOutput = True
-outputDir  = str(working_dir) + "/pacsSpecOutNC/"
+outputDir  = str(working_dir)+"/pacsSpecOutC5/"
 if (not os.path.exists(outputDir)): os.mkdir(outputDir)
 if verbose and saveOutput: print "The products of this pipeline will be saved in ",outputDir
 
-nameBasis  = str(obsid)+"_"+target+"_"+od+"_Hipe_"+hipeVersion+"_calSet_"+calSet+"_"+camera+"_telescope"
+nameBasis  = str(obsid)+"_"+target+"_"+od+"_Hipe_"+hipeVersion+"_calSet_"+calSet+"_"+camera+"_norm_poc"
 
 # ------------------------------------------------------------------------------
 #        Processing      Level 0 -> Level 0.5
@@ -203,8 +212,7 @@ slicedFrames = addUtc(slicedFrames, obs.auxiliary.timeCorrelation)
 # Add the pointing information of the central spaxel to the Status
 #   Uses the pointing, horizons product (solar system object ephemeries), 
 #   orbitEphemeris products, and the SIAM cal file.
-# 
-slicedFrames = specAddInstantPointing(slicedFrames, obs.auxiliary.pointing, calTree = calTree, orbitEphem = obs.auxiliary.orbitEphemeris, horizonsProduct = obs.auxiliary.horizons)    
+slicedFrames = specAddInstantPointing(slicedFrames, obs.auxiliary.pointing, calTree = calTree, orbitEphem = obs.auxiliary.orbitEphemeris, horizonsProduct = obsorrrected.auxiliary.horizons)    
 
 # If SSO, move SSO target to a fixed position in sky. This is needed for mapping SSOs.
 if (isSolarSystemObject(obs)):
@@ -230,7 +238,7 @@ slicedFrames = waveCalc(slicedFrames, calTree=calTree)
 
 # Correct the wavelength for the spacecraft velocity. 
 # Uses the pointing, orbitEphemeris and timeCorrelation product.
-slicedFrames = specCorrectHerschelVelocity(slicedFrames, obs.auxiliary.orbitEphemeris, obs.auxiliary.pointing, obs.auxiliary.timeCorrelation, obs.auxiliary.horizons)
+slicedFrames = specCorrectHerschelVelocity(slicedFrames, obs.auxiliary.orbitEphemeris, obs.auxiliary.pointing, obs.auxiliary.timeCorrelation, obs.auxiliary.horizons, force=True)
 
 # Find the major logical blocks of this observation and organise them in the 
 # BlockTable attached to the Frames; used cal file: ObcpDescription
@@ -278,6 +286,7 @@ slicedFrames = activateMasks(slicedFrames, slicedFrames.get(0).getMaskTypes())
 slicedFrames = convertSignal2StandardCap(slicedFrames, calTree=calTree)
 
 # Compute the differential signal of each on-off pair of datapoints, for each chopper cycle
+#  -->computes the normalised difference: 2 * (on - off)/(on + off)
 # The calibration block is cut out of the slicedFrames, so only the scientific slices remain.
 slicedFrames = specDiffChop(slicedFrames, scical = "sci", keepall = False, normalize=True)
 
@@ -297,11 +306,122 @@ if saveOutput:
 	# To restore the data:
 	# slicedCubes = readSliced(name, poolLocation=outputDir)
 
+# Compute the telescope background flux from the off-source data, and normalise the on-source data by this
+# For more detail on the parameters, see the URM for this task
+# The task uses the offRatio calibration product
+slicedFrames, background = specRespCalToTelescope(slicedFrames, obs.auxiliary.hk, calTree = calTree, reduceNoise = 1)
+
+if verbose:
+    # Visualise the telescope background spectrum in Jy
+    pBack = PlotXY(background.refs[0].product.wavelengths, background.refs[0].product.fluxJy, xtitle="Wavelength [$\mu$m]", ytitle="Flux [Jy]", titleText="Telescope Background")
+    for slice in range(1,len(background.refs)):
+        pBack.addLayer(LayerXY(background.refs[slice].product.wavelengths, background.refs[slice].product.fluxJy))
+    #ptel = plotTelescopeModel(telescope=background, stroke=2, color=Color.black)
+
+slicedFrames = activateMasks(slicedFrames, String1d(["SATURATION","RAWSATURATION","NOISYPIXELS","BADPIXELS","UNCLEANCHOP","GRATMOVE","GLITCH"]), exclusive = True)
+
+# --- POINTING OFFSET CORRECTION
+
+# The next tasks will determine the pointing, and compute a flux correction wrt the pointing error.
+# The correction is based on the assumption of (hence only valid for) a point source.
+# The instantaneous pointing can be estimated from the flux distribution between the central spaxels,
+# compared to the flux distribution of a perfectly pointed point source (derived from the beam calfiles).
+# This is the path followed when usePointingProduct = False.
+# This relies entirely on the flux measured in the central 9 spaxels, hence it requires sufficient S/N.
+
+# The pointing error can also be seen as made of two components: an absolute offset, and a jitter around it.
+# The absolute offset can only be determined thanks to the tasks described above,
+# but one can determine an median offset per pointing, i.e. per nod. That allows
+# to determine the absolute offset from coadded data, and thus have a better result for weaker sources.
+# This is the path followed when usePointingProduct = True
+# The jitter is then derived from the gyro-propagated pointing products that come with the observation.
+# NB: these products have been improved by new calculations (gyro-propagation), so make sure
+# your level0 products have been processed with SPG 11 or higher (see the PACS and Herschel wiki)
+
+usePointingProduct = 1
+
+# STEP 0 
+# The point source must be located on the central 3x3 spaxels for this to work
+# => we must only consider those spaxels
+spaxels = Int1d([6,7,8,11,12,13,16,17,18])
+
+# Slice per grating scan to save memory when performing the next tasks
+rules = [SlicingRule("ScanDir",1)]
+slicedFrames = pacsSliceContext(slicedFrames, slicingRules = rules, removeUndefined=1)[0]
+
+if verbose: slicedSummary(slicedFrames)
+
+if saveOutput: saveSlicedCopy(slicedFrames, nameBasis+"_slicedFrames_prePOC", poolLocation=outputDir)
+
+# STEP 1
+# Determine a map that is the chi-squared of the differences between the flux of 
+# your point source and the flux of the centred beam
+# Task uses the various beams calibration products 
+# Some parameters:
+#   oversample: oversampling factor to interpolate the beams over
+#       The higher the oversample, the more precise the position determination will be
+#       The requested computer resources are proportional to oversample^2.
+#   smoothFactor: smoothing factor along the spectral domain (working in grating positions rather than wavelength)
+#       Every grating plateau (set of data-points taken at the same grating position) is medianed by default. 
+#       Or you can median every "smoothFactor" grating plateau instead, rather than just one: leading to a higher S/N
+#       When perNod is True, smoothFactor is ignored and a smoothFactor is calculated in a way that around 5 grating plateaux will be left. 
+oversampleBeam = 5
+smoothFactor1 = 10
+chiSqr = specDetermineChiSquare(slicedFrames, calTree = calTree, spaxels = spaxels, oversample = oversampleBeam, smoothFactor = smoothFactor1, perNod = usePointingProduct)
+
+# STEP 2
+# Using the chiSqr, now determine the pointing offsets (i.e. those which caused the measured flux offsets)
+# Some parameters:
+#     chiThreshold: defines the minimum area of the chi square map: MIN(Chi2) < chi2 < chi_threshold*MIN(Chi2)
+#     smoothWidth: median box width for smoothing the signal along the timeline: default is 0, i.e. no smoothing
+# The output product contains the derived source position, stored in the array coordinates 
+# of the beam calibration products (25x25 images with a step of 2.5 arcsec)
+pointingOffset = specDeterminePointingOffset(slicedFrames, chiSqr, spaxels=spaxels, chiThreshold = 1.2, smoothWidth = 0, sigmaClip = 2.5,searchMax=1,useMedianPointingInLeak=1)
+
+# STEP 3
+# For slicedFrames that have Ra/Dec arrays calculated using the gyro-propagated pointing product the following task creates a pointing offset
+# By default, we get the median pointingOffset from steps 1 & 2 above, and the jitter from the spacecraft's pointing product (here)
+# Alternatively, you may also skip steps 1 & 2, and directly plug any pre-determined pointingOffset here (e.g. derived with another method, or from the other camera)
+if usePointingProduct:
+    smoothFactor2 = 3
+    pointingOffset = specDeterminePreCalculatedPointing(slicedFrames, pointingOffset, oversample =  oversampleBeam, smoothFactor=smoothFactor2)
+
+# STEP 4 
+# Calculate the flux correction based on the pointing offset determined in the previous step 
+# and add the flux correction factors to the pointingOffset product.
+if usePointingProduct:
+	pointingOffset = specDeterminePointingOffsetFromPreCalculatedPointing(slicedFrames, pointingOffset, calTree=calTree, spaxels=spaxels)
+
+# Plot the pointing jitter 
+if verbose:
+    pjitter = plotPointingOffset(pointingOffset, calTree=calTree)
+
+# STEP 5
+# Apply the pointing corrections factors to the flux of the 9 central spaxels.
+slicedFrames = specApplyPointingCorrection(slicedFrames, pointingOffset, spaxels = spaxels)
+
+# Apply a small time- and wavelength-dependent correction to the telescope background to recover the abs. flux calibration
+if calTree.version < 61 or calTree.version > 64:
+    slicedFrames, telBackCor = specCorrectTelescopeBackground(slicedFrames, calTree = calTree)
+
+# STEP 6 Re-slice the sliced products according to the standard rules
+slicedFrames = pacsSliceContext(slicedFrames)[0]
+point, chi = reSlicePointingProducts(slicedFrames, pointingOffset)
+del(chiSqr,chi)
+
+if verbose: slicedSummary(slicedFrames)
+
+# --- END OF POINTING OFFSET CORRECTION
+
+if saveOutput: 
+    saveSlicedCopy(slicedFrames, nameBasis+"_slicedFrames_preFF", poolLocation=outputDir)
+    saveSlicedCopy(point, nameBasis+ "_pointingOffsetProduct", poolLocation=outputDir) 
+
 # Refine the spectral flatfield.
 # For very short ranges (<~5 um, when the continuum can be approximated by a straight line)
 # consider using the line-scan pipeline script.
 # . excludeLeaks=True will remove wavelength ranges affected by spectral leakages.
-#   It is always recommended, and is mandatory if you use the present pipeline script
+#   It is always recommended, and mandatory when using the present script
 # . selectedRange allows one to restrict the flat-field to a user-defined range
 #   The spectrum outside of the selected range must be discarded from any scientific analysis.
 # . useSplinesModel branches between fitting splines or polynomials.
@@ -318,8 +438,7 @@ slicedCubes = specFrames2PacsCube(slicedFrames)
 # ------------------------------------------------------------------------------
 #         Processing      Level 1 -> Level 2
 # ------------------------------------------------------------------------------
-
-if verbose: slicedSummary(slicedCubes)
+#
 
 # Building a wavelength grid. 
 # Used cal file: wavelengthGrid
@@ -338,14 +457,14 @@ if ((not locals().has_key('multiObs')) or (not multiObs)):
 
 waveGrid=wavelengthGrid(slicedCubes, oversample=oversample, upsample=upsample, calTree = calTree)
 
-# Activate all masks - but see the PDRG Chap. 3 for more information about activating the GLITCH mask at this point in the pipeline
+# Activate all masks 
 slicedCubes = activateMasks(slicedCubes, slicedCubes.get(0).maskTypes, exclusive = True)
 
 # Flag the remaining outliers (sigma-clipping in wavelength domain)
 slicedCubes = specFlagOutliers(slicedCubes, waveGrid, nSigma=5, nIter=1)
 
-# Activate all masks
-slicedCubes = activateMasks(slicedCubes, String1d([str(i) for i in slicedCubes.get(0).maskTypes if i not in ["INLINE", "OUTLIERS_B4FF"]]), exclusive = True)
+# Activate all masks 
+slicedCubes = activateMasks(slicedCubes, slicedCubes.get(0).maskTypes, exclusive = True)
 
 # Rebin all selected cubes on the consistent wavelength grids (mandatory for the next task specAddNod)
 # To compare the rebinned spectrum to the dot cloud (possibly with various rebinning parameters), see the PDRG (Chap 3)
@@ -356,52 +475,33 @@ if verbose:
     # Sky footprint
     # overlay parameter: Plot the footprint on an image.
     # values: [None, 'WISE', 'MSX', obsid, image]
-    overlay = None
+    overlay = None 
     p9 = plotCubesRaDec(slicedRebinnedCubes, overlay = overlay)
 
 # Average the nod-A & nod-B rebinned cubes.
 # All cubes at the same raster position are averaged.
-# This is the final science-grade product, for all observations except the spatially 
-# oversampled rasters (for point sources, see the mandatory post-processing below)
+# This is the final science-grade product currently possible, for all observations except 
+# the spatially oversampled rasters
 slicedFinalCubes = specAddNodCubes(slicedRebinnedCubes)
 
-# Computes the telescope background flux and scales the normalized signal with the telescope background flux
-slicedFinalCubes, background = specRespCalToTelescope(slicedFinalCubes, obs.auxiliary.hk, calTree = calTree)
+if verbose: 
+	slicedSummary(slicedFinalCubes)
+	# plot all slices for a given spaxel (at this stage, normally only 1 / range and / raster position)
+	x,y = 2,2
+	p11 = plotCubes(slicedFinalCubes,x=x,y=y)
+	#5x5 plot of one of the rebinned cubes (one line/range at one raster position)
+	slice = 0
+	p10 = plotCube5x5(slicedFinalCubes.refs[slice].product)
 
-if verbose:
-    slicedSummary(slicedFinalCubes)
-    # Visualise the telescope background spectrum in Jy
-    pBack = PlotXY(background.refs[0].product.wavelengths, background.refs[0].product.fluxJy, xtitle="Wavelength [$\mu$m]", ytitle="Flux [Jy]", titleText="Telescope Background")
-    for slice in range(1,len(background.refs)):
-	pBack.addLayer(LayerXY(background.refs[slice].product.wavelengths, background.refs[slice].product.fluxJy))
-    #ptel = plotTelescopeModel(telescope=background, stroke=2, color=Color.black)
-    #
-    # Central Spaxel for all raster positions (at this stage, normally only 1 / range and / raster position)
-    x,y = 2,2
-    pfinal = plotCubes(slicedFinalCubes, x=x, y=y,stroke=1,title="plotCubes - "+str(obsid)+" "+camera,subtitle="Final Rebinned Spectrum. Spaxel ["+str(x)+","+str(y)+"].\n No point source correction applied")
-    #
-    # Same as above, now overplotting an estimate of the continuum RMS (biased 'inside' the spectral lines).
-    # For line scans, the continuum level is estimated from a polynomial of order 1 fitted outside the spectral line.
-    pstd  = plotCubesStddev(slicedFinalCubes, plotLowExp=1, plotDev=0, nsigma=3, isLineScan=-1, filterWidth=20, smoothLevel=6, spaxelX=x, spaxelY=y, verbose=verbose, calTree=calTree)
-    pstd.titleText, pstd.subtitleText="plotCubesStddev - "+str(obsid)+" "+camera,"Final Rebinned Spectrum & uncertainties. Spaxel ["+str(x)+","+str(y)+"].\n No point source correction applied"
-    #
-    # 5x5 plot of one of the rebinned cubes (one line/range at one raster position)
-    slice = 0
-    p55 = plotCube5x5(slicedFinalCubes.get(slice), frameTitle="plotCube5x5 - "+str(obsid)+" "+camera+" slice "+str(slice))
 
 if saveOutput:
-	name = nameBasis+"_slicedCubes"
-	saveSlicedCopy(slicedCubes, name, poolLocation=outputDir)
-	name = nameBasis+"_slicedRebinnedCubes"
-	saveSlicedCopy(slicedRebinnedCubes, name, poolLocation=outputDir)
-	name = nameBasis+"_slicedFinalCubes"
-	saveSlicedCopy(slicedFinalCubes, name, poolLocation=outputDir)
-
-# ------------------------------------------------------------------------------
-#         Processing Level 2.0
-# ------------------------------------------------------------------------------
-#
-#
+    name = nameBasis+"_slicedCubes"
+    saveSlicedCopy(slicedCubes, name, poolLocation=outputDir)
+    name = nameBasis+"_slicedRebinnedCubes"
+    saveSlicedCopy(slicedRebinnedCubes, name, poolLocation=outputDir)
+    name = nameBasis+"_slicedFinalCubes"
+    saveSlicedCopy(slicedFinalCubes, name, poolLocation=outputDir)
+    
 # ------------------------------------------------------------------------------
 #         Post-Processing
 # ------------------------------------------------------------------------------
@@ -417,27 +517,6 @@ if saveOutput:
 # calibrated spectrum, run extractCentralSpectrum. 
 # - Single pointing of extended source or spatially undersampled rasters: 
 # the final science-grade product is the "rebinned" cubes, or "interpolated" cubes
-
-# ------- EXTENDED SOURCES - SPATIALLY OVERSAMPLED RASTERS ---------------------
-
-# Spatially oversampled rasters can be combined in a single (projected)cube via 
-# spectral projection.
-# See the PDRG Chap. 3 and the URM entry for a longer explanation of this 
-# spectral projection and the parameters of the task
-
-# SPECPROJECT
-# specProject works on the final rebinned cubes.
-slicedProjectedCubes = specProject(slicedFinalCubes,outputPixelsize=3.0)
-
-if saveOutput:
-  name = nameBasis+"_slicedProjectedCubes"
-  saveSlicedCopy(slicedProjectedCubes, name, poolLocation=outputDir)
-
-# Display the projected cube in the Spectrum Explorer
-if verbose and (obs.obsMode=="Mapping"):
-	slice = 0
-	oneProjectedSlice = slicedProjectedCubes.refs[slice].product
-	openVariable("oneProjectedSlice", "Spectrum Explorer")
 
 # ------- POINT SOURCES --------------------------------------------------------
 
@@ -494,29 +573,18 @@ medianFilterWidth   = 15
 
 for slice in range(len(slicedFinalCubes.refs)):
     if verbose: print
-    # a. Extract central spectrum, incl. point source correction (c1)
+    # a. Extract central spectrum, incl. point source correction (c1) 
     # b. Extract SUM(central_3x3 spaxels), incl. point source correction (c9)
     # c. Scale central spaxel to the level of the central_3x3 (c129 -> See PDRG & print extractCentralSpectrum.__doc__)
-    c1_nc,c9_nc,c129_nc = extractCentralSpectrum(slicedFinalCubes.get(slice), smoothing=smoothing, width=gaussianFilterWidth, preFilterWidth=medianFilterWidth, nLowFreq=nLowFreq, calTree=calTree, verbose=verbose)
+    c1_c5,c9_c5,c129_c5 = extractCentralSpectrum(slicedFinalCubes.get(slice), smoothing=smoothing, width=gaussianFilterWidth, preFilterWidth=medianFilterWidth, nLowFreq=nLowFreq, calTree=calTree, verbose=verbose)
     #
     # Save to Fits
     if saveOutput:
-        name = nameBasis + "_centralSpaxel_PointSourceCorrected_Corrected3x3NO_slice_"
-        simpleFitsWriter(product=c1_nc,file = outputDir + name + str(slice).zfill(2)+".fits")
+        # ! The Pointing Offset Correction is computed for the SUM(9 central spaxels)
+        # ! After it, this 'c1' spectrum should ideally not be used => we won't save it
+        #name = nameBasis + "_centralSpaxel_PointSourceCorrected_Corrected3x3NO_slice_"
+        #simpleFitsWriter(product=c1,file = outputDir + name + str(slice).zfill(2)+".fits")
         name = nameBasis + "_central9Spaxels_PointSourceCorrected_slice_"
-        simpleFitsWriter(product=c9_nc,file = outputDir + name + str(slice).zfill(2)+".fits")
+        simpleFitsWriter(product=c9_c5,file = outputDir + name + str(slice).zfill(2)+".fits")
         name = nameBasis + "_centralSpaxel_PointSourceCorrected_Corrected3x3YES_slice_"
-        simpleFitsWriter(product=c129_nc,file = outputDir + name + str(slice).zfill(2)+".fits")
-
-# ------- UNDERSAMPLED MAPS & SINGLE POINTING OF EXTENDED SOURCES --------------
-
-# The final science grade products are the previously produced "slicedFinalCubes"
-# You can also interpolate these cubes on a regular spatial grid using specInterpolate
-"""
-outputPixelsize = 3.0
-slicedInterpolatedCubes = specInterpolate(slicedFinalCubes, outputPixelsize=outputPixelsize, conserveFlux=True)
-
-if saveOutput:
-	name = nameBasis+"_slicedInterpolatedCubes"
-	saveSlicedCopy(slicedInterpolatedCubes, name, poolLocation=outputDir)
-"""
+        simpleFitsWriter(product=c129_c5,file = outputDir + name + str(slice).zfill(2)+".fits")
