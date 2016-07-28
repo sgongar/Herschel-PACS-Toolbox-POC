@@ -86,6 +86,7 @@ Author: PACS ICC
 """
 
 import os,sys
+"""
 # ------------------------------------------------------------------------------
 # 
 # Preparation
@@ -95,7 +96,6 @@ import os,sys
 #          True  - will trigger diagnostic output on the screen, plots, and displays
 verbose = True
 
-"""
 # ------------------------------------------------------------------------------
 # GET THE DATA
 # ------------------------------------------------------------------------------
@@ -185,12 +185,12 @@ except:
 #	              products of this pipeline (intermediate and final). 
 # Example: outputDir = "/home/me/Herschel/PacsSpectro/pipelineOutput/"
 # When saveOutput is True, nameBasis will be used as basis for the filenames of all outputs
-saveOutput = True
+saveOutput = False
 outputDir  = str(working_dir) + "pacsSpecOutC9/"
 if (not os.path.exists(outputDir)): os.mkdir(outputDir)
 if verbose and saveOutput: print "The products of this pipeline will be saved in ",outputDir
 
-nameBasis  = str(obsid)+"_"+target+"_"+od+"_Hipe_"+hipeVersion+"_calSet_"+calSet+"_"+camera+"_norm_poc"
+nameBasis  = str(obsids.keys()[j])+"_"+target+"_"+od+"_Hipe_"+hipeVersion+"_calSet_"+calSet+"_"+camera+"_norm_poc"
 
 # ------------------------------------------------------------------------------
 #        Processing      Level 0 -> Level 0.5
@@ -213,7 +213,7 @@ slicedFrames = addUtc(slicedFrames, obs.auxiliary.timeCorrelation)
 # Add the pointing information of the central spaxel to the Status
 #   Uses the pointing, horizons product (solar system object ephemeries), 
 #   orbitEphemeris products, and the SIAM cal file.
-slicedFrames = specAddInstantPointing(slicedFrames, obs.auxiliary.pointing, calTree = calTree, orbitEphem = obs.auxiliary.orbitEphemeris, horizonsProduct = obsorrrected.auxiliary.horizons)    
+slicedFrames = specAddInstantPointing(slicedFrames, obs.auxiliary.pointing, calTree = calTree, orbitEphem = obs.auxiliary.orbitEphemeris, horizonsProduct = obs.auxiliary.horizons)    
 
 # If SSO, move SSO target to a fixed position in sky. This is needed for mapping SSOs.
 if (isSolarSystemObject(obs)):

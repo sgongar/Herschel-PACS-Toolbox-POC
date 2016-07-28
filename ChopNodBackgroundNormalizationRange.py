@@ -77,6 +77,7 @@ Author: PACS ICC
 """
 
 import os,sys
+"""
 # ------------------------------------------------------------------------------
 # 
 # Preparation
@@ -85,7 +86,7 @@ import os,sys
 # verbose: False - silent, execute the pipeline only
 #          True  - will trigger diagnostic output on the screen, plots, and displays
 verbose = True
-"""
+
 # ------------------------------------------------------------------------------
 # GET THE DATA
 # ------------------------------------------------------------------------------
@@ -136,18 +137,18 @@ obs.auxiliary.pointing = newPP
 # for the specific time of your observation (obs=obs)
 calTree = getCalTree(obs=obs)
 if verbose:
-	print calTree
-	print calTree.common
-	print calTree.spectrometer
+    print calTree
+    print calTree.common
+    print calTree.spectrometer
 
 # ------------------------------------------------------------------------------
 # SELECT DATA FROM ONE CAMERA 
 # ------------------------------------------------------------------------------
-
+"""
 # Red or blue camera ? 
 if ((not locals().has_key('multiObs')) or (not multiObs)):
-	camera    = 'blue'
-
+    camera    = 'blue'
+"""
 # For your camera, extract the Frames (scientific data), the rawramps (raw data 
 # for one pixel), and the DMC header (the mechanisms' status information, 
 # sampled at a high frequency) 
@@ -156,7 +157,8 @@ slicedRawRamp = level0.raw.getCamera(camera).product
 slicedDmcHead = level0.dmc.getCamera(camera).product    
 
 # Get an overview of the basic structure of the data, prior to any processing
-if verbose: slicedSummary(slicedFrames)
+if verbose:
+    slicedSummary(slicedFrames)
 
 # ------------------------------------------------------------------------------
 # SETUP -> OUTPUT
@@ -165,23 +167,28 @@ if verbose: slicedSummary(slicedFrames)
 # Extract basic information
 calSet = str(calTree.version)
 try:
-	target      = str(obs.meta["object"].value).replace(" ","").replace(".","").replace("+","plus")
-	od          = "OD"+str(int(obs.meta["odNumber"].value)).zfill(4)
-	hipeVersion = (str(Configuration.getProjectInfo().track) + '_' + str(Configuration.getProjectInfo().build)).replace(".","_")
+    target = str(obs.meta["object"].value).replace(" ","").replace(".","").replace("+","plus")
+    od = "OD" + str(int(obs.meta["odNumber"].value)).zfill(4)
+    hipeVersion = (str(Configuration.getProjectInfo().track) + '_' +\
+                   str(Configuration.getProjectInfo().build)).replace(".","_")
 except:
-	target,od,hipeVersion = "","",""
+    target, od, hipeVersion = "", "", ""
 
 # saveOutput: False - nothing is saved
 #             True  - the output directory 'outputDir' will be used to store the 
 #	              products of this pipeline (intermediate and final). 
 # Example: outputDir = "/home/me/Herschel/PacsSpectro/pipelineOutput/"
-# When saveOutput is True, nameBasis will be used as basis for the filenames of all outputs
-saveOutput = True
-outputDir  = str(working_dir) + "pacsSpecOutNC/"
-if (not os.path.exists(outputDir)): os.mkdir(outputDir)
-if verbose and saveOutput: print "The products of this pipeline will be saved in ",outputDir
+# When saveOutput is True, nameBasis will be used as basis for the filenames of 
+# all outputs
+saveOutput = False
+outputDir = str(working_dir) + "pacsSpecOutNC/"
+if (not os.path.exists(outputDir)):
+    os.mkdir(outputDir)
+if verbose and saveOutput:
+    print "The products of this pipeline will be saved in ", outputDir
 
-nameBasis  = str(obsid)+"_"+target+"_"+od+"_Hipe_"+hipeVersion+"_calSet_"+calSet+"_"+camera+"_telescope"
+nameBasis  = str(obsids.keys()[j]) + "_" + target + "_" + od + "_Hipe_" +\
+             hipeVersion + "_calSet_" + calSet + "_" + camera + "_telescope"
 
 # ------------------------------------------------------------------------------
 #        Processing      Level 0 -> Level 0.5
@@ -190,7 +197,8 @@ nameBasis  = str(obsid)+"_"+target+"_"+od+"_Hipe_"+hipeVersion+"_calSet_"+calSet
 # flag the saturated data in a mask "SATURATION" (and "RAWSATURATION": this 
 # uses the raw data we get for some pixels)
 # used cal files: RampSatLimits and SignalSatLimits
-slicedFrames = specFlagSaturationFrames(slicedFrames, rawRamp = slicedRawRamp, calTree=calTree, copy=1)
+slicedFrames = specFlagSaturationFrames(slicedFrames, rawRamp=slicedRawRamp,
+                                        calTree=calTree, copy=1)
 
 # Convert digital units to Volts, used cal file: Readouts2Volts
 slicedFrames = specConvDigit2VoltsPerSecFrames(slicedFrames, calTree=calTree)
@@ -205,14 +213,21 @@ slicedFrames = addUtc(slicedFrames, obs.auxiliary.timeCorrelation)
 #   Uses the pointing, horizons product (solar system object ephemeries), 
 #   orbitEphemeris products, and the SIAM cal file.
 # 
-slicedFrames = specAddInstantPointing(slicedFrames, obs.auxiliary.pointing, calTree = calTree, orbitEphem = obs.auxiliary.orbitEphemeris, horizonsProduct = obs.auxiliary.horizons)    
+slicedFrames = specAddInstantPointing(slicedFrames, obs.auxiliary.pointing,
+                                      calTree=calTree,
+                                      orbitEphem=obs.auxiliary.orbitEphemeris,
+                                      horizonsProduct=obs.auxiliary.horizons)    
 
-# If SSO, move SSO target to a fixed position in sky. This is needed for mapping SSOs.
+# If SSO, move SSO target to a fixed position in sky. This is needed for 
+# mapping SSOs.
 if (isSolarSystemObject(obs)):
-  slicedFrames = correctRaDec4Sso (slicedFrames, timeOffset=0, orbitEphem=obs.auxiliary.orbitEphemeris, horizonsProduct=obs.auxiliary.horizons, linear=0)
+    slicedFrames = correctRaDec4Sso(slicedFrames, timeOffset=0,
+                                    orbitEphem=obs.auxiliary.orbitEphemeris,
+                                    horizonsProduct=obs.auxiliary.horizons,
+                                    linear=0)
 
-# Extend the Status of Frames with the grating and chopper parameters GRATSCAN, CHOPPER, CHOPPOS
-# used cal file: ChopperThrowDescription
+# Extend the Status of Frames with the grating and chopper parameters GRATSCAN, 
+# CHOPPER, CHOPPOS used cal file: ChopperThrowDescription
 slicedFrames = specExtendStatus(slicedFrames, calTree=calTree)
 
 # Convert the chopper readouts to an angle wrt. focal plane unit and the sky
@@ -224,42 +239,55 @@ slicedFrames = convertChopper2Angle(slicedFrames, calTree=calTree)
 slicedFrames = specAssignRaDec(slicedFrames, calTree=calTree)
 
 # Show spatial footprint
-if verbose:  ppoint = slicedPlotPointing(slicedFrames, plotBoresight=False)
+if verbose:
+    ppoint = slicedPlotPointing(slicedFrames, plotBoresight=False)
 
 # Add the wavelength for each pixel (wave dataset), used cal file: WavePolynomes
 slicedFrames = waveCalc(slicedFrames, calTree=calTree)
 
 # Correct the wavelength for the spacecraft velocity. 
 # Uses the pointing, orbitEphemeris and timeCorrelation product.
-slicedFrames = specCorrectHerschelVelocity(slicedFrames, obs.auxiliary.orbitEphemeris, obs.auxiliary.pointing, obs.auxiliary.timeCorrelation, obs.auxiliary.horizons)
+slicedFrames = specCorrectHerschelVelocity(slicedFrames,
+                                           obs.auxiliary.orbitEphemeris,
+                                           obs.auxiliary.pointing,
+                                           obs.auxiliary.timeCorrelation,
+                                           obs.auxiliary.horizons)
 
 # Find the major logical blocks of this observation and organise them in the 
 # BlockTable attached to the Frames; used cal file: ObcpDescription
-slicedFrames = findBlocks(slicedFrames, calTree = calTree)
+slicedFrames = findBlocks(slicedFrames, calTree=calTree)
 
 # Flag the known bad or noisy pixels in the masks "BADPIXELS" and "NOISYPIXELS"
 # used cal files: BadPixelMask and NoisyPixelMask
 slicedFrames = specFlagBadPixelsFrames(slicedFrames, calTree=calTree)
 
 # Summary of the slices 
-if verbose: slicedSummary(slicedFrames)
+if verbose:
+    slicedSummary(slicedFrames)
 
-# Slice the data by Line/Range, Raster Point, nod position, nod cycle, on/off position and per band. 
+# Slice the data by Line/Range, Raster Point, nod position, nod cycle, on/off 
+# position and per band. 
 # The parameters removeUndefined and removeMasked are for cleaning purposes
 # If you want to keep the OUTOFBAND data, set removeMasked to False
-slicedFrames, additionalOutContexts = pacsSliceContext(slicedFrames,[slicedDmcHead],removeUndefined=True, removeMasked=True)
+slicedFrames, additionalOutContexts = pacsSliceContext(slicedFrames,
+                                                       [slicedDmcHead],
+                                                       removeUndefined=True,
+                                                       removeMasked=True)
 slicedDmcHead = additionalOutContexts[0]
 
 # The internal structure of your data has changed
 if verbose: slicedSummary(slicedFrames)
 
 # Flag the data affected by the chopper movement in the mask "UNCLEANCHOP"
-# Uses the high resolution Dec/Mec header and the cal files ChopperAngle and ChopperJitterThreshold 
-slicedFrames = flagChopMoveFrames(slicedFrames, dmcHead=slicedDmcHead, calTree=calTree)
+# Uses the high resolution Dec/Mec header and the cal files ChopperAngle and
+# ChopperJitterThreshold 
+slicedFrames = flagChopMoveFrames(slicedFrames, dmcHead=slicedDmcHead,
+                                  calTree=calTree)
 
 # Flag the data effected by the grating movement in the mask "GRATMOVE"
 # Uses the high resolution Dec/Mec header and the cal file GratingJitterThreshold 
-slicedFrames = flagGratMoveFrames(slicedFrames, dmcHead=slicedDmcHead, calTree=calTree)
+slicedFrames = flagGratMoveFrames(slicedFrames, dmcHead=slicedDmcHead,
+                                  calTree=calTree)
 
 # ------------------------------------------------------------------------------
 #         Processing      Level 0.5 -> Level 1
@@ -269,49 +297,56 @@ slicedFrames = flagGratMoveFrames(slicedFrames, dmcHead=slicedDmcHead, calTree=c
 slicedFrames = activateMasks(slicedFrames, String1d([" "]), exclusive = True)
 
 # Detect and flag glitches ("GLITCH" mask)
-slicedFrames = specFlagGlitchFramesQTest(slicedFrames,copy=1)
+slicedFrames = specFlagGlitchFramesQTest(slicedFrames, copy=1)
 
 # Activate all masks, for all slices
 slicedFrames = activateMasks(slicedFrames, slicedFrames.get(0).getMaskTypes())
 
-# Convert the signal level to the reference integration capacitance (which is the smallest one)
-# used cal file: capacitanceRatios
+# Convert the signal level to the reference integration capacitance (which is 
+# the smallest one) used cal file: capacitanceRatios
 slicedFrames = convertSignal2StandardCap(slicedFrames, calTree=calTree)
 
-# Compute the differential signal of each on-off pair of datapoints, for each chopper cycle
-# The calibration block is cut out of the slicedFrames, so only the scientific slices remain.
-slicedFrames = specDiffChop(slicedFrames, scical = "sci", keepall = False, normalize=True)
+# Compute the differential signal of each on-off pair of datapoints, for each
+# chopper cycle
+# The calibration block is cut out of the slicedFrames, so only the scientific 
+# slices remain.
+slicedFrames = specDiffChop(slicedFrames, scical="sci", keepall=False, 
+                            normalize=True)
 
 if verbose:
-	# Data Structure. Only science blocks are left
-	slicedSummary(slicedFrames)
-	# Detector signal: signal is now differential
-	pbasic = plotSignalBasic(slicedFrames, slice=0, titleText="plotSignalBasic")
+    # Data Structure. Only science blocks are left
+    slicedSummary(slicedFrames)
+    # Detector signal: signal is now differential
+    pbasic = plotSignalBasic(slicedFrames, slice=0, titleText="plotSignalBasic")
 
 if saveOutput:
-	name=nameBasis+"_slicedFrames_B4FF"
-	try:
-		saveSlicedCopy(slicedFrames,name, poolLocation=outputDir)
-	except:
-		print "Exception raised: ",sys.exc_info()
-		print "You may have to remove: ", outputDir+'/'+name
-	# To restore the data:
-	# slicedCubes = readSliced(name, poolLocation=outputDir)
+    name=nameBasis + "_slicedFrames_B4FF"
+    try:
+        saveSlicedCopy(slicedFrames,name, poolLocation=outputDir)
+    except:
+        print "Exception raised: ",sys.exc_info()
+        print "You may have to remove: ", outputDir+'/'+name
+    # To restore the data:
+    # slicedCubes = readSliced(name, poolLocation=outputDir)
 
 # Refine the spectral flatfield.
-# For very short ranges (<~5 um, when the continuum can be approximated by a straight line)
-# consider using the line-scan pipeline script.
-# . excludeLeaks=True will remove wavelength ranges affected by spectral leakages.
-#   It is always recommended, and is mandatory if you use the present pipeline script
+# For very short ranges (<~5 um, when the continuum can be approximated by a 
+# straight line) consider using the line-scan pipeline script.
+# . excludeLeaks=True will remove wavelength ranges affected by spectral 
+#   leakages. It is always recommended, and is mandatory if you use the present
+#   pipeline script
 # . selectedRange allows one to restrict the flat-field to a user-defined range
-#   The spectrum outside of the selected range must be discarded from any scientific analysis.
+#   The spectrum outside of the selected range must be discarded from any 
+#   scientific analysis.
 # . useSplinesModel branches between fitting splines or polynomials.
 #	- Parameter "polyOrder" is overridden when using splines.
 #	- when using polynomials : polyOrder = 3 will work for most SEDs scans.
 
 useSplinesModel = True
 excludeLeaks = True
-slicedFrames = specFlatFieldRange(slicedFrames,polyOrder=3, verbose=verbose, excludeLeaks=excludeLeaks, selectedRange=None, useSplinesModel=useSplinesModel)
+slicedFrames = specFlatFieldRange(slicedFrames, polyOrder=3, verbose=verbose,
+                                  excludeLeaks=excludeLeaks, selectedRange=None,
+                                  useSplinesModel=useSplinesModel)
 
 # Convert the Frames to PacsCubes
 slicedCubes = specFrames2PacsCube(slicedFrames)
@@ -320,36 +355,45 @@ slicedCubes = specFrames2PacsCube(slicedFrames)
 #         Processing      Level 1 -> Level 2
 # ------------------------------------------------------------------------------
 
-if verbose: slicedSummary(slicedCubes)
+if verbose:
+    slicedSummary(slicedCubes)
 
 # Building a wavelength grid. 
 # Used cal file: wavelengthGrid
-# The wavelength grid is used to perform a final sigma clipping on the spectrum (specFlagOutliers)
-#     and then to rebin the spectrum (specWaveRebin)
+# The wavelength grid is used to perform a final sigma clipping on the spectrum
+#      (specFlagOutliers) and then to rebin the spectrum (specWaveRebin)
 # Note that for the final cube rebinning it is recommended that: 
-#    - For single scan SED or Nyquist sampled range scans, it is recommended to perform the final 
-#        rebinning with oversample=2, upsample>=1, which corresponds to the native resolution of 
-#        the instrument
-#    - For line scan, deep range scans or Nyquist sampled range scans with repetition factor > 1, 
-#        oversampling > 2 is made possible by the high degree of redundancy provided by the observation
+#    - For single scan SED or Nyquist sampled range scans, it is recommended to 
+#        perform the final rebinning with oversample=2, upsample>=1, which 
+#        corresponds to the native resolution of the instrument
+#    - For line scan, deep range scans or Nyquist sampled range scans with 
+#        repetition factor > 1, oversampling > 2 is made possible by the high
+#        degree of redundancy provided by the observation
 
 if ((not locals().has_key('multiObs')) or (not multiObs)):
-	oversample = 2
-	upsample   = 2
+    oversample = 2
+    upsample = 2
 
-waveGrid=wavelengthGrid(slicedCubes, oversample=oversample, upsample=upsample, calTree = calTree)
+waveGrid = wavelengthGrid(slicedCubes, oversample=oversample, upsample=upsample,
+                          calTree=calTree)
 
-# Activate all masks - but see the PDRG Chap. 3 for more information about activating the GLITCH mask at this point in the pipeline
-slicedCubes = activateMasks(slicedCubes, slicedCubes.get(0).maskTypes, exclusive = True)
+# Activate all masks - but see the PDRG Chap. 3 for more information about 
+# activating the GLITCH mask at this point in the pipeline
+slicedCubes = activateMasks(slicedCubes, slicedCubes.get(0).maskTypes,
+                            exclusive=True)
 
 # Flag the remaining outliers (sigma-clipping in wavelength domain)
 slicedCubes = specFlagOutliers(slicedCubes, waveGrid, nSigma=5, nIter=1)
 
 # Activate all masks
-slicedCubes = activateMasks(slicedCubes, String1d([str(i) for i in slicedCubes.get(0).maskTypes if i not in ["INLINE", "OUTLIERS_B4FF"]]), exclusive = True)
+slicedCubes = activateMasks(slicedCubes, 
+                            String1d([str(i) for i in slicedCubes.get(0).maskTypes if i not in ["INLINE", "OUTLIERS_B4FF"]]),
+                            exclusive=True)
 
-# Rebin all selected cubes on the consistent wavelength grids (mandatory for the next task specAddNod)
-# To compare the rebinned spectrum to the dot cloud (possibly with various rebinning parameters), see the PDRG (Chap 3)
+# Rebin all selected cubes on the consistent wavelength grids (mandatory for 
+# the next task specAddNod)
+# To compare the rebinned spectrum to the dot cloud (possibly with various 
+# rebinning parameters), see the PDRG (Chap 3)
 slicedRebinnedCubes = specWaveRebin(slicedCubes, waveGrid)
 
 if verbose:
@@ -358,45 +402,68 @@ if verbose:
     # overlay parameter: Plot the footprint on an image.
     # values: [None, 'WISE', 'MSX', obsid, image]
     overlay = None
-    p9 = plotCubesRaDec(slicedRebinnedCubes, overlay = overlay)
+    p9 = plotCubesRaDec(slicedRebinnedCubes, overlay=overlay)
 
 # Average the nod-A & nod-B rebinned cubes.
 # All cubes at the same raster position are averaged.
-# This is the final science-grade product, for all observations except the spatially 
-# oversampled rasters (for point sources, see the mandatory post-processing below)
+# This is the final science-grade product, for all observations except the
+# spatially oversampled rasters (for point sources, see the mandatory
+# post-processing below)
 slicedFinalCubes = specAddNodCubes(slicedRebinnedCubes)
 
-# Computes the telescope background flux and scales the normalized signal with the telescope background flux
-slicedFinalCubes, background = specRespCalToTelescope(slicedFinalCubes, obs.auxiliary.hk, calTree = calTree)
+# Computes the telescope background flux and scales the normalized signal
+# with the telescope background flux
+slicedFinalCubes, background = specRespCalToTelescope(slicedFinalCubes, 
+                                                      obs.auxiliary.hk,
+                                                      calTree=calTree)
 
 if verbose:
     slicedSummary(slicedFinalCubes)
     # Visualise the telescope background spectrum in Jy
-    pBack = PlotXY(background.refs[0].product.wavelengths, background.refs[0].product.fluxJy, xtitle="Wavelength [$\mu$m]", ytitle="Flux [Jy]", titleText="Telescope Background")
+    pBack = PlotXY(background.refs[0].product.wavelengths,
+                   background.refs[0].product.fluxJy,
+                   xtitle="Wavelength [$\mu$m]",
+                   ytitle="Flux [Jy]", titleText="Telescope Background")
     for slice in range(1,len(background.refs)):
-	pBack.addLayer(LayerXY(background.refs[slice].product.wavelengths, background.refs[slice].product.fluxJy))
-    #ptel = plotTelescopeModel(telescope=background, stroke=2, color=Color.black)
+        pBack.addLayer(LayerXY(background.refs[slice].product.wavelengths,
+                               background.refs[slice].product.fluxJy))
+    # ptel = plotTelescopeModel(telescope=background, stroke=2,
+    #                           color=Color.black)
     #
-    # Central Spaxel for all raster positions (at this stage, normally only 1 / range and / raster position)
-    x,y = 2,2
-    pfinal = plotCubes(slicedFinalCubes, x=x, y=y,stroke=1,title="plotCubes - "+str(obsid)+" "+camera,subtitle="Final Rebinned Spectrum. Spaxel ["+str(x)+","+str(y)+"].\n No point source correction applied")
+    # Central Spaxel for all raster positions (at this stage, normally only 1 / 
+    # range and / raster position)
+    x, y = 2, 2
+    pfinal = plotCubes(slicedFinalCubes, x=x, y=y, stroke=1,
+                       title="plotCubes - " + str(obsids.keys()[j]) + " " +
+                       camera,subtitle="Final Rebinned Spectrum. Spaxel [" +
+                       str(x) + "," + str(y) +
+                       "].\n No point source correction applied")
     #
-    # Same as above, now overplotting an estimate of the continuum RMS (biased 'inside' the spectral lines).
-    # For line scans, the continuum level is estimated from a polynomial of order 1 fitted outside the spectral line.
-    pstd  = plotCubesStddev(slicedFinalCubes, plotLowExp=1, plotDev=0, nsigma=3, isLineScan=-1, filterWidth=20, smoothLevel=6, spaxelX=x, spaxelY=y, verbose=verbose, calTree=calTree)
-    pstd.titleText, pstd.subtitleText="plotCubesStddev - "+str(obsid)+" "+camera,"Final Rebinned Spectrum & uncertainties. Spaxel ["+str(x)+","+str(y)+"].\n No point source correction applied"
+    # Same as above, now overplotting an estimate of the continuum RMS (biased 
+    # 'inside' the spectral lines).
+    # For line scans, the continuum level is estimated from a polynomial of 
+    # order 1 fitted outside the spectral line.
+    pstd  = plotCubesStddev(slicedFinalCubes, plotLowExp=1, plotDev=0, nsigma=3,
+                            isLineScan=-1, filterWidth=20, smoothLevel=6,
+                            spaxelX=x, spaxelY=y, verbose=verbose,
+                            calTree=calTree)
+    pstd.titleText, pstd.subtitleText = "plotCubesStddev - " +\
+                                        str(obsids.keys()[j]) +\
+                                        " " + camera, "Final Rebinned Spectrum & uncertainties. Spaxel ["+str(x)+","+str(y)+"].\n No point source correction applied"
     #
     # 5x5 plot of one of the rebinned cubes (one line/range at one raster position)
     slice = 0
-    p55 = plotCube5x5(slicedFinalCubes.get(slice), frameTitle="plotCube5x5 - "+str(obsid)+" "+camera+" slice "+str(slice))
+    p55 = plotCube5x5(slicedFinalCubes.get(slice),
+                      frameTitle="plotCube5x5 - " + str(obsids.keys()[j]) +\
+                      " " + camera + " slice " + str(slice))
 
 if saveOutput:
-	name = nameBasis+"_slicedCubes"
-	saveSlicedCopy(slicedCubes, name, poolLocation=outputDir)
-	name = nameBasis+"_slicedRebinnedCubes"
-	saveSlicedCopy(slicedRebinnedCubes, name, poolLocation=outputDir)
-	name = nameBasis+"_slicedFinalCubes"
-	saveSlicedCopy(slicedFinalCubes, name, poolLocation=outputDir)
+    name = nameBasis + "_slicedCubes"
+    saveSlicedCopy(slicedCubes, name, poolLocation=outputDir)
+    name = nameBasis + "_slicedRebinnedCubes"
+    saveSlicedCopy(slicedRebinnedCubes, name, poolLocation=outputDir)
+    name = nameBasis + "_slicedFinalCubes"
+    saveSlicedCopy(slicedFinalCubes, name, poolLocation=outputDir)
 
 # ------------------------------------------------------------------------------
 #         Processing Level 2.0
@@ -407,17 +474,18 @@ if saveOutput:
 #         Post-Processing
 # ------------------------------------------------------------------------------
 
-# Before you proceed with the scientific analysis, you will need to make a choice
-# based on the nature of your object (extended or not), the type of observation
-# that was performed (pointed or raster mapping), and its spatial sampling
-# (oversampled or not). 
+# Before you proceed with the scientific analysis, you will need to make a
+# choice based on the nature of your object (extended or not), the type of
+# observation that was performed (pointed or raster mapping), and its spatial
+# sampling (oversampled or not). 
 # - Spatially-oversampled raster maps: are projected to a single data cube, 
 # thereby recovering the fullest possible spatial information. The final 
 # science-grade product is a "projected" or "drizzled" cube.
 # - Single pointing observations of point sources: to recover the point-source 
 # calibrated spectrum, run extractCentralSpectrum. 
 # - Single pointing of extended source or spatially undersampled rasters: 
-# the final science-grade product is the "rebinned" cubes, or "interpolated" cubes
+# the final science-grade product is the "rebinned" cubes, or "interpolated"
+# cubes
 
 # ------- EXTENDED SOURCES - SPATIALLY OVERSAMPLED RASTERS ---------------------
 
@@ -428,23 +496,24 @@ if saveOutput:
 
 # SPECPROJECT
 # specProject works on the final rebinned cubes.
-slicedProjectedCubes = specProject(slicedFinalCubes,outputPixelsize=3.0)
+slicedProjectedCubes = specProject(slicedFinalCubes, outputPixelsize=3.0)
 
 if saveOutput:
-  name = nameBasis+"_slicedProjectedCubes"
+  name = nameBasis + "_slicedProjectedCubes"
   saveSlicedCopy(slicedProjectedCubes, name, poolLocation=outputDir)
 
 # Display the projected cube in the Spectrum Explorer
 if verbose and (obs.obsMode=="Mapping"):
-	slice = 0
-	oneProjectedSlice = slicedProjectedCubes.refs[slice].product
-	openVariable("oneProjectedSlice", "Spectrum Explorer")
+    slice = 0
+    oneProjectedSlice = slicedProjectedCubes.refs[slice].product
+    openVariable("oneProjectedSlice", "Spectrum Explorer")
 
 # ------- POINT SOURCES --------------------------------------------------------
 
 # For single pointing observations of point sources, the calibrated spectrum is
-# obtained by correcting for the fraction of the PSF that falls out of the (central) spaxel.
-# That is what we call the point source correction. This is done in extractCentralSpectrum.
+# obtained by correcting for the fraction of the PSF that falls out of the
+# (central) spaxel. That is what we call the point source correction. This is 
+# done in extractCentralSpectrum.
 
 # extractCentralSpectrum produces three extra spectra.
 # - "c1" is the central spaxel's spectrum with the point source correction applied 
@@ -498,16 +567,28 @@ for slice in range(len(slicedFinalCubes.refs)):
     # a. Extract central spectrum, incl. point source correction (c1)
     # b. Extract SUM(central_3x3 spaxels), incl. point source correction (c9)
     # c. Scale central spaxel to the level of the central_3x3 (c129 -> See PDRG & print extractCentralSpectrum.__doc__)
-    c1_nc,c9_nc,c129_nc = extractCentralSpectrum(slicedFinalCubes.get(slice), smoothing=smoothing, width=gaussianFilterWidth, preFilterWidth=medianFilterWidth, nLowFreq=nLowFreq, calTree=calTree, verbose=verbose)
+    c1_nc, c9_nc, c129_nc = extractCentralSpectrum(slicedFinalCubes.get(slice),
+                                                   smoothing=smoothing,
+                                                   width=gaussianFilterWidth,
+                                                   preFilterWidth=medianFilterWidth,
+                                                   nLowFreq=nLowFreq,
+                                                   calTree=calTree,
+                                                   verbose=verbose)
     #
     # Save to Fits
     if saveOutput:
-        name = nameBasis + "_centralSpaxel_PointSourceCorrected_Corrected3x3NO_slice_"
-        simpleFitsWriter(product=c1_nc,file = outputDir + name + str(slice).zfill(2)+".fits")
-        name = nameBasis + "_central9Spaxels_PointSourceCorrected_slice_"
-        simpleFitsWriter(product=c9_nc,file = outputDir + name + str(slice).zfill(2)+".fits")
-        name = nameBasis + "_centralSpaxel_PointSourceCorrected_Corrected3x3YES_slice_"
-        simpleFitsWriter(product=c129_nc,file = outputDir + name + str(slice).zfill(2)+".fits")
+        name = nameBasis +\
+               "_centralSpaxel_PointSourceCorrected_Corrected3x3NO_slice_"
+        simpleFitsWriter(product=c1_nc,file = outputDir + name +
+                         str(slice).zfill(2)+".fits")
+        name = nameBasis +\
+               "_central9Spaxels_PointSourceCorrected_slice_"
+        simpleFitsWriter(product=c9_nc,file = outputDir + name +
+                         str(slice).zfill(2)+".fits")
+        name = nameBasis +\
+               "_centralSpaxel_PointSourceCorrected_Corrected3x3YES_slice_"
+        simpleFitsWriter(product=c129_nc,file = outputDir + name +
+                         str(slice).zfill(2)+".fits")
 
 # ------- UNDERSAMPLED MAPS & SINGLE POINTING OF EXTENDED SOURCES --------------
 

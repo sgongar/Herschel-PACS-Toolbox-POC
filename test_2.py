@@ -43,33 +43,32 @@ def plot_graph(first, second, three):
 for j in range(len(obsids.keys())):
     for k in range(len(list_camera)):
         camera = list_camera[k]
+        
         obs = getObservation(obsids.keys()[j], useHsa=1)
-
+        """
         print "ALLES GUT ZUM 1"
         execfile(str(working_dir) + 'ChopNodBackgroundNormalizationRange.py')
         name = str(obsids.keys()[j]) + '_' + str(camera) + '_norm'
         saveObservation(obs, poolLocation = pool_dir, poolName=name)
 
-        """
         print "ALLES GUT ZUM 2"
         execfile(str(working_dir) + 'ChopNodRangeScanPointingCorrection_5.py')
         name = str(obsids.keys()[j]) + '_' + str(camera) + '_corr_5'
         saveObservation(obs, poolLocation=pool_dir, poolName=name)
-
+        """
         print "ALLES GUT ZUM 3"
         execfile(str(working_dir) + 'ChopNodRangeScanPointingCorrection_9.py')
         name = str(obsids.keys()[j]) + '_' + str(camera) + '_corr_9'
         saveObservation(obs, poolLocation=pool_dir, poolName=name)
-        """
 """
 # Produce a plot after each iteration
 for j in range(len(obsids.keys())):
     for k in range(len(list_camera)):
         camera = list_camera[k]
+ 
         sey = str(obsids.keys()[j]) + '_' + str(camera) + '_norm'
         obs_case1 = getObservation(obsid=obsids.keys()[j],
                                    poolLocation=str(pool_dir), poolName=sey)
-        
         sey = str(obsids.keys()[j]) + '_' + str(camera) + '_corr_5'
         obs_case2 = getObservation(obsid=obsids.keys()[j],
                                    poolLocation=str(pool_dir), poolName=sey)
@@ -77,19 +76,6 @@ for j in range(len(obsids.keys())):
         sey = str(obsids.keys()[j]) + '_' + str(camera) + '_corr_9'
         obs_case3 = getObservation(obsid=obsids.keys()[j],
                                    poolLocation=str(pool_dir), poolName=sey)
-        # plot_graph('blabla1', 'blabla2', 'blabla3')
         
-
-# No flatfielding against flatfielding range selecting range [198, 203]
-test_plot_1 = PlotXY(titleText="NoFF vs. FFRangeSelecting [198, 203]")
-test_plot_1.addLayer(LayerXY(wve_t1, flx_t1, line=1,
-                             name="no flatfielding selected",
-                             xrange=[196,205]))
-test_plot_1.addLayer(LayerXY(wve_t2, flx_t2, line=1,
-                             name="flatfielding range selecting range [198, 203]"))
-test_plot_1.legend.visible=1
-test_plot_1.xaxis.tick.gridLines=1
-test_plot_1.yaxis.tick.gridLines=1
-test_plot_1.saveAsPNG(str(plot_dir) + "NoFF_vs_FFRangeSelect[198_203]_" +
-                      str(obsid) + "_200um_" + str(version) + ".png")
+        # plot_graph('blabla1', 'blabla2', 'blabla3')\
 """
