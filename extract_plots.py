@@ -555,3 +555,8 @@ c1_1342188038_bpoc9, c9_1342188038_bpoc9, c129_1342188038_bpoc9 = extractCentral
                                                                                          nLowFreq=nLowFreq,
                                                                                          calTree=calTree,
                                                                                          verbose=False)
+
+
+plot_1342208884_c9 = openSE(c9_1342208884_rnc, display=1)
+plot_1342208884_c9.add(c9_1342208884_rpoc5)
+plot_1342208884_c9.add(c9_1342208884_rpoc9)
